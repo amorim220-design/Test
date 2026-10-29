@@ -228,6 +228,53 @@ body.playing { cursor: none; }
 body.display-mode #topbar,
 body.display-mode #panel,
 body.display-mode #menu,
-body.display-mode #hint {
+body.display-mode #hint,
+body.display-mode #playHint {
   display: none !important;
+}
+
+.play-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 24px));
+  z-index: 40;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line, #2a2740);
+  background: rgba(12, 10, 20, 0.94);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.play-hint h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.play-hint ol {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+
+.play-hint li {
+  margin-bottom: 6px;
+}
+
+.play-hint .mono {
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.play-hint button {
+  margin-top: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #2a2740);
+  background: #1a1729;
+  color: #fff;
+  font-size: 12px;
 }

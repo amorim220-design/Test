@@ -708,6 +708,33 @@ document.getElementById('invertChk').addEventListener('change', e => {
   persistSoon();
 });
 
+document.getElementById('btnCloseHint').addEventListener('click', hidePlayHint);
+document.getElementById('btnCopyLink').addEventListener('click', async () => {
+  const url = displayUrl();
+  if (!url) {
+    toast('Link indisponível: rode node server.js no celular');
+    return;
+  }
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast('Endereço da tela do projetor copiado');
+  } catch (e) {
+    toast('Copie manualmente: ' + url);
+  }
+});
+
 const visualSelect = document.getElementById('visualSelect');
 for (const [id, label] of VISUALS) {
   const o = document.createElement('option');
@@ -893,10 +920,35 @@ function toast(msg) {
   hintTimer = setTimeout(() => { h.style.opacity = '0'; }, 2200);
 }
 
+function displayUrl() {
+  if (!link.info) return null;
+  const key = link.info.key || '';
+  const urls = link.info.urls || [];
+  if (urls.length) return urls[0] + '/?display=1&key=' + key;
+  return 'http://localhost:' + (location.port || 8080) + '/?display=1&key=' + key;
+}
+
+function showPlayHint() {
+  const el = document.getElementById('playHint');
+  if (!el) return;
+  const target = document.getElementById('playLink');
+  if (target) {
+    target.textContent = displayUrl() ||
+      'rode "node server.js" no celular para liberar o Link sem fio';
+  }
+  el.classList.remove('hidden');
+}
+
+function hidePlayHint() {
+  const el = document.getElementById('playHint');
+  if (el) el.classList.add('hidden');
+}
+
 function enterPlay() {
   state.playing = true;
   document.body.classList.add('playing');
   document.getElementById('menu').classList.add('hidden');
+  showPlayHint();
   const el = document.documentElement;
   try {
     if (el.requestFullscreen) {
@@ -915,6 +967,7 @@ function enterPlay() {
 function exitPlay() {
   state.playing = false;
   document.body.classList.remove('playing');
+  hidePlayHint();
   try {
     if (document.fullscreenElement && document.exitFullscreen) {
       const p = document.exitFullscreen();
