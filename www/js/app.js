@@ -1,5 +1,9 @@
 'use strict';
 
+const PARAMS = new URLSearchParams(location.search);
+const IS_DISPLAY = PARAMS.get('display') === '1';
+const LINK_KEY = PARAMS.get('key') || '';
+
 const VISUALS = [
   ['solid', 'Cor sólida'],
   ['gradient', 'Degradê'],
@@ -548,6 +552,7 @@ function pointInQuad(p, quad) {
 }
 
 function onPointerDown(e) {
+  if (IS_DISPLAY) return;
   if (state.playing) { exitPlay(); return; }
   if (e.target !== stage) return;
   const { w, h } = cssSize();
@@ -793,6 +798,7 @@ function persistSoon() {
   clearTimeout(persistSoon._t);
   persistSoon._t = setTimeout(() => {
     try { localStorage.setItem('prism.project', JSON.stringify(serialize())); } catch (e) {}
+    pushToLink();
   }, 300);
 }
 
@@ -946,6 +952,10 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 document.addEventListener('keydown', e => {
+  if (IS_DISPLAY) {
+    if (e.key === 'f' || e.key === 'F') { if (state.playing) exitPlay(); else enterPlay(); }
+    return;
+  }
   if (e.key === 'Escape') exitPlay();
   if (e.key === 'f' || e.key === 'F') { if (state.playing) exitPlay(); else enterPlay(); }
   if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('ui-hidden');
@@ -962,7 +972,75 @@ if (!nativeShell && 'serviceWorker' in navigator && location.protocol.startsWith
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-restore();
+const link = { info: null, es: null };
+
+async function probeLink() {
+  if (IS_DISPLAY) return;
+  try {
+    const r = await fetch('/api/link', { cache: 'no-store' });
+    if (!r.ok) return;
+    link.info = await r.json();
+    renderLinkInfo();
+  } catch (e) {}
+}
+
+function renderLinkInfo() {
+  const box = document.getElementById('linkBox');
+  if (!box || !link.info) return;
+  box.classList.remove('hidden');
+  const key = link.info.key || '';
+  const urls = (link.info.urls || []).map(u => u + '/?display=1&key=' + key);
+  const fallback = 'http://localhost:' + (location.port || 8080) + '/?display=1&key=' + key;
+  document.getElementById('linkUrl').textContent = urls.length ? urls.join('    ') : fallback;
+  document.getElementById('linkStatus').textContent =
+    'Código ' + key + ' · telas conectadas: ' + (link.info.displays || 0);
+}
+
+function pushToLink() {
+  if (!link.info || IS_DISPLAY) return;
+  const body = JSON.stringify(serialize());
+  fetch('/api/state?key=' + encodeURIComponent(link.info.key), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body
+  }).catch(() => {});
+}
+
+function applyRemote(project) {
+  const list = Array.isArray(project.shapes) ? project.shapes : [];
+  state.shapes = list.map(s => {
+    const base = makeShape(s.kind === 'ellipse' ? 'ellipse' : 'quad');
+    return Object.assign(base, s, { id: nextId(), mediaName: null });
+  });
+  state.selected = state.shapes.length ? state.shapes[0].id : null;
+}
+
+function startDisplayLink() {
+  document.body.classList.add('display-mode');
+  const es = new EventSource('/api/stream?key=' + encodeURIComponent(LINK_KEY));
+  link.es = es;
+  es.onmessage = ev => {
+    try {
+      const data = JSON.parse(ev.data);
+      if (data && data.project) applyRemote(data.project);
+    } catch (e) {}
+  };
+  es.onopen = () => setLinkHint('ligado ao controle');
+  es.onerror = () => setLinkHint('sem sinal do controle — reconectando');
+}
+
+function setLinkHint(text) {
+  const h = document.getElementById('hint');
+  if (h) h.textContent = text;
+}
+
+if (IS_DISPLAY) {
+  startDisplayLink();
+  stage.addEventListener('pointerdown', () => { if (!state.playing) enterPlay(); });
+} else {
+  restore();
+  probeLink();
+}
 renderShapeList();
 syncControls();
 setTimeout(hideHint, 6000);

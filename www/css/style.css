@@ -216,3 +216,18 @@ body.playing { cursor: none; }
 }
 
 .warn { color: #fbbf24 !important; }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  margin: 6px 0;
+  color: var(--accent);
+}
+
+body.display-mode #topbar,
+body.display-mode #panel,
+body.display-mode #menu,
+body.display-mode #hint {
+  display: none !important;
+}

@@ -30,6 +30,21 @@ Para usar em outra tela/rede, o servidor mostra o IP da rede (ex.: `http://192.1
 
 No Chrome: menu > **Adicionar à tela inicial** para abrir como app em tela cheia e funcionar offline.
 
+## Modo Link: celular controla, projetor/TV exibe
+
+Ideia equivalente ao "Lazy Lighting Link", mas com código próprio (SSE + estado no servidor, sem dependências):
+
+1. No celular, rode `node server.js` e abra `http://localhost:8080`.
+2. Toque no menu (⋮): aparece o **código** e o **endereço da tela do projetor**.
+3. No navegador do projetor/TV (mesmo Wi-Fi), abra o endereço exibido, algo como
+   `http://192.168.x.x:8080/?display=1&key=ABC123`.
+4. A tela do projetor mostra só o visual, sem interface. Clique nela ou aperte `F` para tela cheia.
+5. A partir daí, mexer no celular (arrastar cantos, trocar visual, efeito, opacidade) reflete na hora na tela do projetor.
+
+Limites: mídia importada (vídeo/foto) **não** é transmitida — a tela do projetor mostra o padrão de
+calibração no lugar. O modo Link só existe no modo navegador com `server.js` rodando; o APK não
+embute servidor.
+
 ## Gerar o APK Android
 
 O Termux não tem o Android SDK (aapt2/gradle x86_64), então o APK é montado de graça no GitHub Actions:
