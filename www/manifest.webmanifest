@@ -1,0 +1,14 @@
+{
+  "name": "Prism Mapper",
+  "short_name": "Prism",
+  "description": "Estúdio de projection mapping: formas, vídeos, fotos e visuais gerados.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#07060c",
+  "theme_color": "#0b0a12",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

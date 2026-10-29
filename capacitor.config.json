@@ -1,0 +1,9 @@
+{
+  "appId": "com.prism.mapper",
+  "appName": "Prism Mapper",
+  "webDir": "www",
+  "backgroundColor": "#07060c",
+  "android": {
+    "allowMixedContent": false
+  }
+}
