@@ -19,6 +19,14 @@ const types = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
   '.ico': 'image/x-icon'
 };
 
@@ -141,16 +149,40 @@ const server = http.createServer((req, res) => {
     res.writeHead(403).end('forbidden');
     return;
   }
-  fs.readFile(file, (err, data) => {
-    if (err) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('not found');
       return;
     }
+    const type = types[path.extname(file)] || 'application/octet-stream';
+    const range = req.headers.range;
+    const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range) : null;
+    if (m) {
+      let start = m[1] ? parseInt(m[1], 10) : 0;
+      let end = m[2] ? parseInt(m[2], 10) : st.size - 1;
+      if (!Number.isFinite(start)) start = 0;
+      if (!Number.isFinite(end) || end >= st.size) end = st.size - 1;
+      if (start > end || start >= st.size) {
+        res.writeHead(416, { 'content-range': 'bytes */' + st.size }).end();
+        return;
+      }
+      res.writeHead(206, {
+        'content-type': type,
+        'content-length': end - start + 1,
+        'content-range': 'bytes ' + start + '-' + end + '/' + st.size,
+        'accept-ranges': 'bytes',
+        'cache-control': 'no-cache'
+      });
+      fs.createReadStream(file, { start, end }).pipe(res);
+      return;
+    }
     res.writeHead(200, {
-      'content-type': types[path.extname(file)] || 'application/octet-stream',
+      'content-type': type,
+      'content-length': st.size,
+      'accept-ranges': 'bytes',
       'cache-control': 'no-cache'
     });
-    res.end(data);
+    fs.createReadStream(file).pipe(res);
   });
 });
 

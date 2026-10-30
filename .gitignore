@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .link-key
+www/media/
 .gradle/
 android/.gradle/
 android/build/

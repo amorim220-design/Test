@@ -771,42 +771,150 @@ document.getElementById('btnCenter').addEventListener('click', () => {
   persistSoon();
 });
 
-document.getElementById('fileMedia').addEventListener('change', e => {
-  const f = e.target.files && e.target.files[0];
-  e.target.value = '';
-  if (!f) return;
-  const s = selectedShape();
-  if (!s) return;
-  const name = f.name;
-  const url = URL.createObjectURL(f);
-  if (f.type.startsWith('video')) {
+const EXT_KIND = {
+  mp4: 'video', m4v: 'video', mov: 'video', webm: 'video', mkv: 'video',
+  '3gp': 'video', avi: 'video', ogv: 'video', ts: 'video',
+  jpg: 'image', jpeg: 'image', png: 'image', webp: 'image', gif: 'image',
+  bmp: 'image', avif: 'image', heic: 'image', heif: 'image'
+};
+
+function kindFromName(name) {
+  const n = (name || '').toLowerCase();
+  const i = n.lastIndexOf('.');
+  if (i < 0) return null;
+  return EXT_KIND[n.slice(i + 1)] || null;
+}
+
+function kindFromBytes(buf) {
+  if (!buf || buf.length < 12) return null;
+  const b = buf;
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'video';
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return 'video';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image';
+  if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image';
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image';
+  return null;
+}
+
+function sniffKind(file) {
+  return new Promise(resolve => {
+    let settled = false;
+    const done = k => {
+      if (settled) return;
+      settled = true;
+      resolve(k);
+    };
+    const t = file.type || '';
+    if (t.startsWith('video/')) return done('video');
+    if (t.startsWith('image/')) return done('image');
+    const byName = kindFromName(file.name);
+    if (byName) return done(byName);
+    try {
+      const fr = new FileReader();
+      fr.onload = () => done(kindFromBytes(new Uint8Array(fr.result)));
+      fr.onerror = () => done(null);
+      fr.readAsArrayBuffer(file.slice(0, 16));
+    } catch (e) {
+      done(null);
+    }
+    setTimeout(() => done(null), 1500);
+  });
+}
+
+function mediaErrorText(v) {
+  const err = v && v.error;
+  if (!err) return 'erro desconhecido';
+  const map = {
+    1: 'carregamento abortado',
+    2: 'erro de rede',
+    3: 'falha ao decodificar',
+    4: 'formato/codec não suportado pelo aparelho'
+  };
+  return map[err.code] || ('código ' + err.code);
+}
+
+function createMedia(url, name, kind) {
+  if (kind === 'video') {
     const v = document.createElement('video');
     v.src = url;
     v.loop = true;
     v.muted = true;
+    v.defaultMuted = true;
     v.playsInline = true;
     v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    v.preload = 'auto';
     const rec = { kind: 'video', el: v, ready: false, tex: null, name, dirty: false };
     v.addEventListener('loadeddata', () => { rec.ready = true; });
-    v.addEventListener('error', () => { alert('Não foi possível abrir o vídeo.'); });
+    v.addEventListener('canplay', () => { rec.ready = true; });
+    v.addEventListener('error', () => toast('Vídeo não abriu: ' + mediaErrorText(v)));
+    v.load();
     v.play().catch(() => {});
     state.media.set(name, rec);
-  } else if (f.type.startsWith('image')) {
-    const img = new Image();
-    img.src = url;
-    const rec = { kind: 'image', el: img, ready: false, tex: null, name, dirty: true };
-    img.onload = () => { rec.ready = true; rec.dirty = true; };
-    img.onerror = () => alert('Não foi possível abrir a imagem.');
-    state.media.set(name, rec);
-  } else {
-    alert('Formato não suportado.');
-    return;
+    return rec;
+  }
+  const img = new Image();
+  img.src = url;
+  const rec = { kind: 'image', el: img, ready: false, tex: null, name, dirty: true };
+  img.onload = () => { rec.ready = true; rec.dirty = true; };
+  img.onerror = () => toast('Imagem não abriu: arquivo corrompido ou codec não suportado');
+  state.media.set(name, rec);
+  return rec;
+}
+
+function attachMedia(name) {
+  const s = selectedShape();
+  if (!s) {
+    toast('Selecione uma forma antes de importar');
+    return false;
   }
   s.visual = 'media';
   s.mediaName = name;
   renderShapeList();
   syncControls();
   persistSoon();
+  return true;
+}
+
+document.getElementById('fileMedia').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const kind = await sniffKind(f);
+  const name = f.name || 'midia';
+  if (!kind) {
+    toast('Formato não suportado (tipo: ' + (f.type || 'sem tipo') + ')');
+    return;
+  }
+  const url = URL.createObjectURL(f);
+  createMedia(url, name, kind);
+  if (attachMedia(name)) toast('Importado: ' + name);
+});
+
+document.getElementById('btnImportUrl').addEventListener('click', async () => {
+  const input = document.getElementById('mediaUrl');
+  const raw = (input.value || '').trim();
+  if (!raw) {
+    toast('Cole um endereço de vídeo ou imagem');
+    return;
+  }
+  const url = /^https?:\/\//i.test(raw) ? raw : ('http://' + raw);
+  toast('Carregando…');
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = await res.blob();
+    const name = decodeURIComponent(url.split('/').pop().split('?')[0]) || 'midia';
+    const kind = (blob.type && blob.type.split('/')[0] === 'video') ? 'video'
+      : (blob.type && blob.type.split('/')[0] === 'image') ? 'image'
+      : (kindFromName(name) || 'video');
+    createMedia(URL.createObjectURL(blob), name, kind);
+    if (attachMedia(name)) toast('Importado: ' + name);
+  } catch (err) {
+    toast('Falha ao baixar: ' + err.message);
+  }
 });
 
 document.getElementById('btnImportMedia').addEventListener('click', () => {
